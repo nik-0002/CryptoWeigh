@@ -116,6 +116,11 @@ export default async function Dashboard({ searchParams }) {
           <p className="big">
             {latest ? Number(latest.weight_kg).toFixed(2) : '–'} <span className="unit">kg</span>
           </p>
+          {latest ? (
+            <p className="big">
+              {Math.round(Number(latest.weight_kg) * 1000)} <span className="unit">g</span>
+            </p>
+          ) : null}
         </div>
         <div className="card">
           <p className="muted">Total readings stored</p>
@@ -153,15 +158,17 @@ export default async function Dashboard({ searchParams }) {
               <th>Photo</th>
               <th>Device</th>
               <th className="num">Weight (kg)</th>
+              <th className="num">Weight (g)</th>
               <th>SHA-256 hash</th>
               <th>Integrity</th>
+              <th>AI Visual Audit</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="empty">No readings to show yet.</td>
+                <td colSpan={10} className="empty">No readings to show yet.</td>
               </tr>
             ) : null}
             {rows.map((r) => {
@@ -181,9 +188,23 @@ export default async function Dashboard({ searchParams }) {
                   </td>
                   <td className="mono">{r.device_id}</td>
                   <td className="num strong">{Number(r.weight_kg).toFixed(2)}</td>
+                  <td className="num strong">{Math.round(Number(r.weight_kg) * 1000)}</td>
                   <td className="mono hash">{r.data_hash}</td>
                   <td className="nowrap">
                     {ok ? <span className="good">Hash matches</span> : <span className="warn">Hash mismatch</span>}
+                  </td>
+                  <td>
+                    {r.vision_verdict === 'VISUAL_MASS_ANOMALY' ? (
+                      <span className="badge" style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)', borderColor: 'var(--amber)' }}>
+                        ⚠️ Visual-Mass Anomaly ({r.detected_count}× {r.detected_item}: exp {r.expected_range_kg})
+                      </span>
+                    ) : r.vision_verdict === 'PLAUSIBLE_MATCH' ? (
+                      <span className="badge" style={{ background: 'rgba(45,212,191,0.15)', color: '#2dd4bf', borderColor: '#2dd4bf' }}>
+                        ✓ {r.detected_count}× {r.detected_item} ({r.expected_range_kg})
+                      </span>
+                    ) : (
+                      <span className="muted small">No verdict</span>
+                    )}
                   </td>
                   <td className="nowrap">
                     {r.tamper_status ? <span className="badge badge-red">Tamper detected</span> : <span className="badge">Secure</span>}

@@ -9,11 +9,33 @@ import {
   updateLocalReading,
   uploadPhotoToCloud,
 } from '../../../lib/offlineSync.js';
+import { checkVisualMassAnomaly } from '../../../lib/visualMassCheck.js';
 import { isJpeg, MAX_PHOTO_BYTES, parseReadingId } from '../../../lib/photo.js';
 
 export const dynamic = 'force-dynamic';
 
 const fail = (status, message) => NextResponse.json({ status: 'error', message }, { status });
+
+// Runs AFTER the photo is saved. Any failure is caught and ignored so photo uploads never fail.
+async function visionAudit(id, bytes) {
+  try {
+    const local = (await getLocalReadings()).find((r) => r.id === id);
+    let weight = local?.weight_kg;
+    if (weight == null) {
+      const { data } = await withTimeout(supabase().from('ledger').select('weight_kg').eq('id', id).maybeSingle());
+      weight = data?.weight_kg;
+    }
+    if (weight == null) return;
+    const result = await checkVisualMassAnomaly(bytes, Number(weight));
+    await updateLocalReading(id, result).catch(() => {});
+    if (!local || local.synced) {
+      const targetId = local?.cloud_id || id;
+      await withTimeout(supabase().from('ledger').update(result).eq('id', targetId)).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Vision audit skipped:', e.message);
+  }
+}
 
 // The ESP32-CAM uploads one JPEG per reading:  POST /api/photos?reading_id=123
 export async function POST(request) {
@@ -61,6 +83,7 @@ export async function POST(request) {
   //    The photo goes up together with the reading as soon as the internet is back.
   const local = (await getLocalReadings()).find((r) => r.id === id);
   if (local && !local.synced) {
+    await visionAudit(id, bytes);
     await syncPendingToSupabase();
     return offlineOk();
   }
@@ -77,11 +100,15 @@ export async function POST(request) {
 
     await uploadPhotoToCloud(id, bytes);
     if (savedLocally) await updateLocalReading(id, { photo_uploaded: true });
+    await visionAudit(id, bytes);
     return NextResponse.json({ status: 'success', id, bytes: bytes.length }, { status: 200 });
   } catch (e) {
     console.error('Cloud photo upload failed:', e.message);
     // Offline: the camera still gets success; sync uploads the photo later.
-    if (savedLocally) return offlineOk();
+    if (savedLocally) {
+      await visionAudit(id, bytes);
+      return offlineOk();
+    }
     return fail(500, 'Storage or database error.');
   }
 }
