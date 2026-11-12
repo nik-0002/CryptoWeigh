@@ -5,3 +5,4 @@ node_modules
 .vercel
 offline-readings.json
 public/offline-photos
+.env*.save
