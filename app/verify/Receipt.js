@@ -5,14 +5,39 @@ import { useEffect, useState } from 'react';
 const POLL_MS = 2000;
 const MAX_MS = 15000;
 
-export default function Receipt({ initial }) {
+const SYNC_MAX_MS = 5 * 60 * 1000;
+
+export default function Receipt({ id, initial }) {
   const [r, setR] = useState(initial);
-  const [waiting, setWaiting] = useState(!initial.has_photo);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [waiting, setWaiting] = useState(!initial?.has_photo);
   const [copied, setCopied] = useState(false);
   const [imgKey, setImgKey] = useState(0);
 
+  // Reading not in the ledger yet (the scale may still be syncing): retry every 2 s.
+  useEffect(() => {
+    if (r) return;
+    const started = Date.now();
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/public-reading/${id}`, { cache: 'no-store' });
+        if (res.ok) {
+          setR(await res.json());
+          clearInterval(timer);
+          return;
+        }
+      } catch {}
+      if (Date.now() - started >= SYNC_MAX_MS) {
+        clearInterval(timer);
+        setGaveUp(true);
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [r, id]);
+
   // The ESP32-CAM uploads ~2-3 s after the reading exists: re-check every 2 s for up to 15 s.
   useEffect(() => {
+    if (!r) return;
     if (r.has_photo) {
       setWaiting(false);
       return;
@@ -20,7 +45,7 @@ export default function Receipt({ initial }) {
     const started = Date.now();
     const timer = setInterval(async () => {
       try {
-        const res = await fetch(`/api/public-reading/${r.id}`, { cache: 'no-store' });
+        const res = await fetch(`/api/public-reading/${id}`, { cache: 'no-store' });
         if (res.ok) {
           const next = await res.json();
           if (next.has_photo) {
@@ -37,7 +62,22 @@ export default function Receipt({ initial }) {
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [r.id, r.has_photo]);
+  }, [r?.id, r?.has_photo]);
+
+  if (!r) {
+    return (
+      <main className="rc-wrap">
+        <header className="rc-head">
+          <h1>Proof of Fair Weight</h1>
+          <p className="rc-sub">Public Cryptographic Receipt • Transaction #{id}</p>
+        </header>
+        <section className="rc-card rc-skel" aria-live="polite">
+          <div className="rc-spin" />
+          <p>Receipt #{id} — {gaveUp ? 'not found. Please rescan or try again later.' : 'Syncing with ledger...'}</p>
+        </section>
+      </main>
+    );
+  }
 
   const good = r.hash_ok && !r.tamper_status;
   const when = new Date(r.created_at).toLocaleString('en-IN', {

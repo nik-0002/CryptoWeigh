@@ -9,20 +9,16 @@ export const metadata = { title: 'Proof of Fair Weight – Receipt', robots: { i
 export default async function Verify({ searchParams }) {
   const sp = await searchParams;
   const id = parseReadingId(typeof sp?.tx_id === 'string' ? sp.tx_id : '');
-  const reading = id ? await getPublicReading(id) : null;
-
-  if (!reading) {
+  if (!id) {
     return (
       <main className="rc-wrap">
         <header className="rc-head">
           <h1>Proof of Fair Weight</h1>
           <p className="rc-sub">Public Cryptographic Receipt</p>
         </header>
-        <div className="rc-banner rc-bad">
-          {id ? `TRANSACTION #${id} NOT FOUND` : 'MISSING OR INVALID TRANSACTION ID'}
-        </div>
+        <div className="rc-banner rc-bad">MISSING OR INVALID TRANSACTION ID</div>
       </main>
     );
   }
-  return <Receipt initial={reading} />;
+  return <Receipt id={id} initial={await getPublicReading(id)} />;
 }
