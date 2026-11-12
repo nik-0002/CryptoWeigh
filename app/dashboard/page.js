@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isAdmin } from '../../lib/auth.js';
 import { supabase } from '../../lib/supabase.js';
 import { expectedHash } from '../../lib/hash.js';
+import { getLocalReadings, syncPendingToSupabase, withTimeout } from '../../lib/offlineSync.js';
 import AutoRefresh from '../../components/AutoRefresh.js';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,9 @@ export default async function Dashboard({ searchParams }) {
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  // Push anything saved while offline to Supabase as soon as the internet is back.
+  await syncPendingToSupabase();
+
   const db = supabase();
   let listQuery = db
     .from('ledger')
@@ -34,21 +38,47 @@ export default async function Dashboard({ searchParams }) {
     .range(from, to);
   if (tamperOnly) listQuery = listQuery.eq('tamper_status', true);
 
-  const [list, totalQ, tamperQ, latestQ, photoQ] = await Promise.all([
-    listQuery,
-    db.from('ledger').select('*', { count: 'exact', head: true }),
-    db.from('ledger').select('*', { count: 'exact', head: true }).eq('tamper_status', true),
-    db.from('ledger').select('weight_kg').order('created_at', { ascending: false }).limit(1),
-    db.from('ledger').select('id, weight_kg').not('photo_path', 'is', null).order('created_at', { ascending: false }).limit(1),
-  ]);
+  let list, totalQ, tamperQ, latestQ, photoQ;
+  let offline = false;
+  try {
+    [list, totalQ, tamperQ, latestQ, photoQ] = await withTimeout(
+      Promise.all([
+        listQuery,
+        db.from('ledger').select('*', { count: 'exact', head: true }),
+        db.from('ledger').select('*', { count: 'exact', head: true }).eq('tamper_status', true),
+        db.from('ledger').select('weight_kg').order('created_at', { ascending: false }).limit(1),
+        db.from('ledger').select('id, weight_kg').not('photo_path', 'is', null).order('created_at', { ascending: false }).limit(1),
+      ]),
+      6000,
+    );
+    // supabase-js reports an unreachable server as an error object, not an exception.
+    offline = !!list.error && /fetch failed|network|ENOTFOUND|ECONN|timed out/i.test(list.error.message || '');
+  } catch {
+    offline = true;
+  }
 
-  const dbError = list.error && list.error.code !== 'PGRST103' ? list.error : null;
-  const rows = list.data ?? [];
-  const totalPages = Math.max(1, Math.ceil((list.count ?? 0) / PAGE_SIZE));
-  const total = totalQ.count ?? 0;
-  const breaches = tamperQ.count ?? 0;
-  const latest = latestQ.data?.[0];
-  const latestPhoto = photoQ.data?.[0];
+  let dbError, rows, totalPages, total, breaches, latest, latestPhoto;
+  if (offline) {
+    // Cloud unreachable: show what is stored on this computer.
+    const all = (await getLocalReadings())
+      .map((r) => ({ ...r, photo_path: r.local_photo_file || (r.photo_uploaded ? r.photo_url : null) }))
+      .filter((r) => !tamperOnly || r.tamper_status);
+    dbError = null;
+    rows = all.slice(from, to + 1);
+    totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+    total = all.length;
+    breaches = all.filter((r) => r.tamper_status).length;
+    latest = all[0];
+    latestPhoto = all.find((r) => r.photo_path);
+  } else {
+    dbError = list.error && list.error.code !== 'PGRST103' ? list.error : null;
+    rows = list.data ?? [];
+    totalPages = Math.max(1, Math.ceil((list.count ?? 0) / PAGE_SIZE));
+    total = totalQ.count ?? 0;
+    breaches = tamperQ.count ?? 0;
+    latest = latestQ.data?.[0];
+    latestPhoto = photoQ.data?.[0];
+  }
   const hrefFor = (p) => `/dashboard?page=${p}${tamperOnly ? '&filter=tamper' : ''}`;
 
   return (
@@ -67,6 +97,12 @@ export default async function Dashboard({ searchParams }) {
           </form>
         </div>
       </header>
+
+      {offline ? (
+        <p className="muted small" role="status">
+          Offline mode: showing readings stored on this computer. They sync to Supabase automatically when the internet returns.
+        </p>
+      ) : null}
 
       {dbError ? (
         <p className="error" role="alert">

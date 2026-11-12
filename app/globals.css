@@ -85,3 +85,32 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
 .thumb:hover { border-color: var(--accent); }
 .latest-photo { display: block; width: 100%; height: 6.5rem; object-fit: cover; border-radius: 0.4rem; border: 1px solid var(--line); margin: 0.4rem 0 0.25rem; background: var(--bg); }
 .photo-empty { margin-top: 0.75rem; }
+
+/* ---- Public receipt (/verify) ---- */
+.rc-wrap { max-width: 32rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
+.rc-head h1 { font-size: 1.5rem; }
+.rc-sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+.rc-banner { border-radius: 0.9rem; padding: 1.1rem 1rem; text-align: center; font-weight: 800; font-size: 1.05rem; line-height: 1.3; letter-spacing: 0.01em; }
+.rc-good { background: rgba(6, 95, 70, 0.45); border: 2px solid var(--green); color: #a7f3d0; }
+.rc-bad { background: var(--red-bg); border: 2px solid var(--red); color: #fecaca; }
+.rc-card { background: var(--panel); border: 1px solid var(--line); border-radius: 0.9rem; padding: 1.1rem; }
+.rc-label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.6rem; }
+.rc-hero { text-align: center; }
+.rc-kg { font-size: 3.4rem; font-weight: 800; color: #fff; line-height: 1.1; }
+.rc-kg span { font-size: 1.4rem; color: var(--muted); font-weight: 600; }
+.rc-g { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.rc-time { color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem; }
+.rc-photo { width: 100%; border-radius: 0.6rem; display: block; }
+.rc-muted { color: var(--muted); font-size: 0.9rem; }
+.rc-skel { aspect-ratio: 4 / 3; border-radius: 0.6rem; display: flex; flex-direction: column; gap: 0.8rem; align-items: center; justify-content: center; color: var(--muted); background: linear-gradient(90deg, #111a2e, #19243d, #111a2e); background-size: 200% 100%; animation: rc-shimmer 1.6s linear infinite; }
+.rc-spin { width: 2rem; height: 2rem; border-radius: 50%; border: 3px solid #2b3856; border-top-color: var(--accent); animation: rc-rot 0.9s linear infinite; }
+@keyframes rc-rot { to { transform: rotate(360deg); } }
+@keyframes rc-shimmer { to { background-position: -200% 0; } }
+.rc-dl { margin: 0 0 0.5rem; }
+.rc-dl dt { color: var(--muted); font-size: 0.78rem; margin-top: 0.7rem; }
+.rc-dl dd { margin: 0.2rem 0 0; font-weight: 600; }
+.rc-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
+.rc-hash { background: #0b1120; border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.6rem; word-break: break-all; overflow-wrap: anywhere; font-weight: 400; }
+.rc-copy { width: 100%; margin-top: 0.5rem; padding: 0.7rem; font: inherit; font-weight: 600; color: #04121f; background: var(--accent); border: 0; border-radius: 0.6rem; cursor: pointer; }
+.rc-green { color: var(--green); }
+.rc-red { color: var(--red); }
